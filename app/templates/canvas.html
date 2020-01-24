@@ -1,0 +1,72 @@
+<html>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <body>
+      <h1>Choose the star in this image</h1>
+      <!-- <h4>This file is {{ filename }}</h4> -->
+
+      <!-- <p id='testing'>testing</p> -->
+      <!-- Note: Full size of canvas should be 2048*2048 -->
+      <canvas id="astroImage" width="512" height="512"></canvas>
+      <!-- <p id="coords">Nothing yet</p> -->
+
+      <form action="" method="post">
+        {{ form.hidden_tag() }}
+        <!-- <p>
+          Enter the name of the folder where the output will be saved here:
+          {{ form.outputFolder }}
+        <p> -->
+
+        <p>
+          These boxes will be filled automatically when you select a star.<br>
+          {{ form.x.label}}
+          {{ form.x }}<br>
+          {{ form.y.label}}
+          {{ form.y }}
+        </p>
+        <p>{{ form.submit() }}</p>
+      </form>
+
+    </body>
+
+    <script type="text/javascript">
+      var img = new Image();  // Source: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Using_images
+      img.addEventListener('load', function() {  // Stops image from trying to display before loaded
+        var canvas = document.getElementById("astroImage");
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);  // Draws image without padding
+        // document.getElementById('coords').innerHTML = document.getElementById('x').defaultValue + document.getElementById('x').contentEditable;  // Testing
+        // document.getElementById('testing').innerHTML = document.getElementById('x').innerHTML
+      }, false);
+      img.src = "static/images/Initial_Image.jpg";  // Loads image using this filepath
+
+      // Source: https://www.geeksforgeeks.org/how-to-get-the-coordinates-of-a-mouse-click-on-a-canvas-element/
+      function getMousePosition(canvas, event) {
+        // ctx.drawImage(img, 0, 0);  // Redraws image, covers up any old circles
+        let rect = canvas.getBoundingClientRect();  // Gets x and y coords of canvas
+        let x = event.clientX - rect.left;  // Adjusts for position of canvas
+        let y = event.clientY - rect.top;
+        // document.getElementById("coords").innerHTML = Math.round(x) + ", " + Math.round(y)  // Tests whether click detected
+        // Source: https://www.w3schools.com/graphics/canvas_coordinates.asp
+        var ctx = canvas.getContext("2d");
+        ctx.strokeStyle = "white";
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, 7);  // Angle goes from 0 to 7 since that creates same circle as 0 to 2pi
+        ctx.stroke();
+
+        // document.getElementById('x').contentEditable = true
+        // document.getElementById('x').value = x.toString(10);
+        // document.getElementById('y').value = y.toString(10);
+        document.getElementById('x').value = Math.round(x);
+        document.getElementById('y').value = Math.round(y);
+      }
+
+      let canvasElem = document.querySelector("canvas");  // Let gives the variable block scope
+
+      canvasElem.addEventListener("click", function(e)  // Runs getMousePosition when canvas clicked
+      {
+          getMousePosition(canvasElem, e);
+      });
+    </script>
+
+</html>
