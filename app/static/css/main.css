@@ -1,3 +1,34 @@
 #astroImage {
   border: 1px solid black;
 }
+
+body {
+  background-color: lightblue;
+  text-align: center;
+}
+
+div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 40px;
+  padding-left: 40px;
+  margin-bottom: 20px;
+/*   flex: 0 0 10em; */
+  max-width: 30em;
+  /*Restricts width of columns*/
+  align-self: baseline;
+}
+
+#forms {
+  max-width: 100em;
+  flex-direction: row;
+}
+
+.info {
+  background-color: lightgray;
+}
+
+.input {
+  background-color: lightgreen;
+}

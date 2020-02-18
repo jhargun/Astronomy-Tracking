@@ -2,30 +2,62 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 
     <body>
-      <h1>Choose the star in this image</h1>
+      <h1>Choose the star</h1>
       <!-- <h4>This file is {{ filename }}</h4> -->
 
       <!-- <p id='testing'>testing</p> -->
-      <!-- Note: Full size of canvas should be 2048*2048 -->
-      <canvas id="astroImage" width="512" height="512"></canvas>
+      <!-- Note: Full size of canvas should be 2048*2048. Making it smaller crops the image -->
+      <canvas id="astroImage" width="2048" height="2048"></canvas>
       <!-- <p id="coords">Nothing yet</p> -->
 
-      <form action="" method="post">
-        {{ form.hidden_tag() }}
-        <!-- <p>
-          Enter the name of the folder where the output will be saved here:
-          {{ form.outputFolder }}
-        <p> -->
+      <div id="forms">
 
-        <p>
-          These boxes will be filled automatically when you select a star.<br>
-          {{ form.x.label}}
-          {{ form.x }}<br>
-          {{ form.y.label}}
-          {{ form.y }}
-        </p>
-        <p>{{ form.submit() }}</p>
-      </form>
+        <div class='info'>
+          <form action="" method="post">
+            {{ form.hidden_tag() }}
+            <!-- <p>
+              Enter the name of the folder where the output will be saved here:
+              {{ form.outputFolder }}
+            <p> -->
+
+            <h4>Enter coordinates manually</h4>
+            <p>
+              These boxes will be filled automatically when you select a star.<br>
+              {{ form.x.label}}
+              {{ form.x }}<br>
+              {{ form.y.label}}
+              {{ form.y }}
+            </p>
+            <p>{{ form.submit() }}</p>
+          </form>
+        </div>
+
+        <div class='input'>
+          <form action="" method="post">
+            {{ form2.hidden_tag() }}
+            {{ form2.threshold }}
+
+
+            <h4>Change noise level</h4>
+            <p>If you cannot find the star or there is too much noise (random white pixels that clearly aren't stars),
+                use one of these options to change the parameters of the denoising and rerun.<br><br>
+
+              <!-- {{form2.radio}}
+              <br> -->
+              {% for subfield in form2.adjust %}
+                <tr>
+                  <td>{{ subfield }}</td>
+                  <td>{{ subfield.label }}</td>
+                </tr>
+              {% endfor %}
+              <br>
+              {{form2.submit}}
+            </p>
+          </form>
+        </div>
+      </div>
+
+
 
     </body>
 
