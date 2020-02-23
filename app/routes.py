@@ -70,7 +70,7 @@ def canvas():
         y = template_rect['y']
         height = template_rect['h']
         width = template_rect['w']
-        img = cv2.imread('app/static/images/Initial_Image.jpg')
+        img = cv2.imread('app/static/images/Initial_Image.jpg', cv2.IMREAD_GRAYSCALE)
         template = img[y:y+height, x:x+width]
         track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape)
         # track_matrix('Testing', 'Data/Testing/Denoised', template_rect)

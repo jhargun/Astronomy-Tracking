@@ -227,7 +227,8 @@ def line_detect(outFoldername, foldername):
             cv2.imwrite("{}/{}".format(outFoldername, path), image)
 
 
-'''Note: At the moment, I have not fully used matrices. I instead mix for loops with opencv and PIL functions.
+'''Note: This is the OLD version. The better matrix implementation is track_matrix_fast
+At the moment, I have not fully used matrices. I instead mix for loops with opencv and PIL functions.
 This takes some time, so in the future I may want to change this'''
 def track_matrix(outFoldername, foldername, template_rect, rot_step=5):
     skipped = 0
@@ -284,13 +285,23 @@ def track_matrix(outFoldername, foldername, template_rect, rot_step=5):
 
 '''Makes the initial transformation matrix, long, assumes (x,y) corresponds to top left)
 rot_step is how many degrees rotation per step, translate step is how many pixels per translation'''
-def make_transform_matrix(img_shape, template_shape, rot_step=5, translate_step=5):
-    transform_matrix = []
-    for ang in tqdm(range(360 // rot_step)):  # Multiply ang by rot_step to get actual angle
-        theta = radians(ang * rot_step)  # Angle is in radians for use later
-        transform_matrix.append([])  # Creates new row of transform_matrix for this rotation
+def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
+    # Maximum length of the list of templates for a given angle (aka the length when the template isn't rotated)
+    print('shapes:', img_shape, template_shape)
+    max_length = int((img_shape[0] - template_shape[0]) / translate_step + 1) * int((img_shape[1] - template_shape[1]) / translate_step + 1)
+    print('Max length:', max_length)
+    # print((img_shape[0] - template_shape[0]) / translate_step)
+    transform_matrix = np.zeros((360 // rot_step, max_length, 2, 3)).astype(np.float16)  # Initialize array with shape
+    # print(np.array(transform_matrix).shape)
+    # print('\n', transform_matrix, '\n')
 
-        # Top/bottom left/right points of template; NOTE: USE (x,y), z=1 for use with 3*3 matrix
+    '''Note: I have reduced the number of angles it goes through to test it without running out of RAM'''
+    for ang in tqdm(range(360 // rot_step)[:3]):  # Multiply ang by rot_step to get actual angle
+        theta = radians(ang * rot_step)  # Angle is in radians for use later
+        # transform_matrix.append([])  # Creates new row of transform_matrix for this rotation
+        matrices = []
+
+        # Top/bottom left/right points of template; NOTE: USE (x,y), z=1 for use with 2*3 matrix
         t_l = np.array([0, 0, 1])
         t_r = np.array([template_shape[1], 0, 1])
         b_l = np.array([0, template_shape[0], 1])
@@ -299,20 +310,33 @@ def make_transform_matrix(img_shape, template_shape, rot_step=5, translate_step=
 
         # Finds x, y adjustment for new shape (since rotating, shape will be different from template_shape)
         rotation_matrix = np.array([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])  # Matrix for rotation only
-        adjust_list = np.array([np.matmul(rotation_matrix, point[:2]) for point in old_points])  # Gets list of rotated points
-        # print('Adjust list shape:', adjust_list.shape)
+        adjust_list = np.matmul(rotation_matrix, old_points[:, :2].T).T  # Gets list of rotated points, shape is (4,2)
+
         min_x = ceil(np.amin(adjust_list[:, 0]))
         width = floor(np.amax(adjust_list[:, 0]) - min_x)
         min_y = ceil(np.amin(adjust_list[:, 1]))
         height = floor(np.amax(adjust_list[:, 1]) - min_y)
 
-
         # for x in range(0, img_shape[1] - template_shape[1], translate_step):
         #     for y in range(0, img_shape[0] - template_shape[0], translate_step):
 
+        print('\nX values:', -min_x, img_shape[1] - width - min_x, (img_shape[1] - width - min_x) // translate_step)
+        print('\nY values:', -min_y, img_shape[0] - height - min_y, (img_shape[0] - height - min_y) // translate_step)
+
+        # troubleshoot_counter = 0
+
+        '''Note: Right here, should I subtract the min_x and min_y from the final? I think, but check again'''
         # Iterates through all x and y values possible
-        for x in range(-min_x, img_shape[1] - width, translate_step):
-            for y in range(-min_y, img_shape[0] - height, translate_step):
+        for x in range(-min_x, img_shape[1] - width - min_x, translate_step):
+            for y in range(-min_y, img_shape[0] - height - min_y, translate_step):
+                # troubleshoot_counter += 1
+                # This is the affine matrix for rotation and translation
+                matrix = np.array([[cos(theta), -sin(theta), x],
+                                   [sin(theta), cos(theta),  y]])
+                matrices.append(matrix)
+                # transform_matrix[ang].append(matrix)
+
+                '''  # All of this was overkill, as it turns out I can just use affine transformation
                 # This is the matrix that does the rotation and translation
                 matrix = np.array([[cos(theta), -sin(theta), x],
                                    [sin(theta), cos(theta),  y],
@@ -327,19 +351,53 @@ def make_transform_matrix(img_shape, template_shape, rot_step=5, translate_step=
                 # if x == -min_x and y == -min_y:
                 #     print('Homography:', homography)
                 # transform_matrix[ang].append(matrix)
+                '''
 
+        # print('TC:', troubleshoot_counter)
+        # print('\n\nMatrices shape:', np.array(matrices).shape)
+        # # Add padding to matrices so transform_matrix is rectangular (can't have jagged np arrays)
+        #
+        # print('Difference:', (max_length - len(matrices)))
+        # print('{} - {} = {}'.format(max_length, len(matrices), (max_length - len(matrices))))
+        # print('Appended part shape:', np.array([[[0,0,0],[0,0,0]]] * (max_length - len(matrices))).shape)
+        if max_length - len(matrices) != 0:
+            matrices = np.append(matrices, [[[0,0,0],[0,0,0]]] * (max_length - len(matrices)), axis=0)
+
+        # print('Matrices post adjustment:',  np.array(matrices).shape, '\n')
+
+        # if len(transform_matrix) == 0:
+        #     transform_matrix = [matrices]
+        # else:
+        #     transform_matrix.append([matrices])
+        transform_matrix[ang] = matrices
+        # print(np.array(transform_matrix).shape)
+        # transform_matrix.append([matrices])
+
+    ''' # This part was doing the adjustment to make the array rectangular, shouldn't be necessary anymore
+    try:
+        test = np.array(transform_matrix)
+        print('\nTest matrix shape:', test.shape, '\n')
+    except Exception as e:
+        print('\nError when trying to convert to np array:', e, '\n')
+
+    # This next part makes
     max_length = 0
     for i in range(len(transform_matrix)):
         if len(transform_matrix[i]) > max_length:
             max_length = len(transform_matrix[i])
     for i in range(len(transform_matrix)):
-        transform_matrix[i].append([[0,0,0],[0,0,0],[0,0,0]])
+        print(np.array([[[0,0,0],[0,0,0]]] * (max_length - len(transform_matrix[i]))).shape)
+        transform_matrix[i].append([[[0,0,0],[0,0,0]]] * (max_length - len(transform_matrix[i])))
+        # transform_matrix[i].append([[0,0,0],[0,0,0],[0,0,0]])
+    '''
+
+    print('Transform shape:',transform_matrix.shape)
 
     # Save the matrix for these steps, image size, and template size; saves a lot of time in the future; uses parameters for name
     filename = 'Matrices/{}x{}_{}x{}_{}_{}.npy'.format(img_shape[1], img_shape[0], template_shape[1], template_shape[0], rot_step, translate_step)
     if not os.path.isfile(os.path.dirname(filename)):
         os.makedirs(os.path.dirname(filename), exist_ok=True)  # Makes matrices folder if it doesn't exist
-    np.save(filename, np.array(transform_matrix))  # Saves matrix for future use
+    np.save(filename, np.array(transform_matrix), allow_pickle=True)  # Saves matrix for future use
 
 
 '''TODO: Add some troubleshooting where it warns if the similarity between matrices is very small'''
@@ -348,20 +406,21 @@ def make_transform_matrix(img_shape, template_shape, rot_step=5, translate_step=
 '''Tracks using matrices, much faster than old version
 Note: foldername should be where the denoised images are stored
 Set save_images to false if you don't want the visualization'''
-def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=5, translate_step=3, save_images=True):
+def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=30, translate_step=30, save_images=True):
     template_shape = template.shape
 
     filename = 'Matrices/{}x{}_{}x{}_{}_{}.npy'.format(img_shape[1], img_shape[0], template_shape[1], template_shape[0], rot_step, translate_step)
     if not os.path.isfile(filename):  # Checking for matrix means if same parameters were already used, no need to remake it
-        print('Making new homography matrices')
+        print('Making new affine matrices')
         make_transform_matrix(img_shape, template_shape, rot_step, translate_step)
 
-    homog_matrices = np.load(filename)
-    print('Beginning 2nd part')
-    homog_shape = homog_matrices.shape
-    print(homog_matrices.shape)
-    homog_matrices = np.reshape(np.prod(homog_matrices[:-2]), *homog_matrices[-2:])  # Reshapes it so it works with for loop
-    print(homog_matrices.shape)
+    aff_matrices = np.load(filename, allow_pickle=True)
+    print('\nBeginning 2nd part;\n')
+    aff_shape = aff_matrices.shape
+    print('Original aff matrices shape:', aff_matrices.shape)
+    # print(np.prod(aff_shape[:-2]), *aff_shape[-2:])
+    aff_matrices = aff_matrices.reshape(np.prod(aff_shape[:-2]), *aff_shape[-2:])  # Reshapes it so it works with for loop
+    print('Reshaped aff matrices shape:', aff_matrices.shape)
 
     background = np.zeros(img_shape)  # Creates black background for template
     positions = []  # Stores positions of template with highest
@@ -369,10 +428,12 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=5
 
     size = (background.shape[1], background.shape[0])
     templates = []
-    for homography in tqdm(homog_matrices):
-        templates.append(cv2.warpPerspective(template, homography, size, background, borderMode=cv2.BORDER_TRANSPARENT))
+    for affine in tqdm(aff_matrices):
+        print('Affine shape:', affine.shape)
+        templates.append(cv2.warpAffine(template.astype(np.float32), affine.astype(np.float32), size, background, borderMode=cv2.BORDER_TRANSPARENT))
+        # templates.append(cv2.warpPerspective(template, homography, size, background, borderMode=cv2.BORDER_TRANSPARENT))
     templates = np.array(templates)
-    print(templates.shape)  # Just for testings
+    print(templates.shape)  # Just for testing
     # templates.reshape(homog_matrices.shape)  # Reshapes back to original shape, but now it's the rotated template
     # print(templates.shape)
 
