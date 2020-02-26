@@ -8,7 +8,6 @@ from process import *
 '''These are major TODOs:
 TODO: fix whatever's wrong with the function that changes denoising threshold (possibly delete folders?)
 '''
-'''Note: Be warned that the wait times for the pages to load will likely be long.'''
 
 
 '''Helper method, denoises an image set and creates the initial image that will be rendered on the canvas.'''

@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 '''This just shows the image using opencv's imshow function. It can be useful for testing so I
-left it here, but since the images are so large (2048*2048), it is often better to save images
+left it here, but since astronomical images are so large (2048*2048), it is often better to save images
 and open them in a different image viewer to analyze them well.'''
 def show_image(image, name='Image'):
     cv2.imshow(name, image)
@@ -291,14 +291,11 @@ def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
     max_length = int((img_shape[0] - template_shape[0]) / translate_step + 1) * int((img_shape[1] - template_shape[1]) / translate_step + 1)
     print('Max length:', max_length)
     # print((img_shape[0] - template_shape[0]) / translate_step)
-    transform_matrix = np.zeros((360 // rot_step, max_length, 2, 3)).astype(np.float16)  # Initialize array with shape
-    # print(np.array(transform_matrix).shape)
-    # print('\n', transform_matrix, '\n')
+    transform_matrix = np.zeros((360 // rot_step, max_length, 2, 3)).astype(np.float16)  # Initialize empty array with correct shape
 
     '''Note: I have reduced the number of angles it goes through to test it without running out of RAM'''
     for ang in tqdm(range(360 // rot_step)[:3]):  # Multiply ang by rot_step to get actual angle
         theta = radians(ang * rot_step)  # Angle is in radians for use later
-        # transform_matrix.append([])  # Creates new row of transform_matrix for this rotation
         matrices = []
 
         # Top/bottom left/right points of template; NOTE: USE (x,y), z=1 for use with 2*3 matrix
@@ -406,15 +403,37 @@ def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
 '''Tracks using matrices, much faster than old version
 Note: foldername should be where the denoised images are stored
 Set save_images to false if you don't want the visualization'''
-def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=30, translate_step=30, save_images=True):
-    template_shape = template.shape
+def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=360, translate_step=200, save_images=True):
+    template_shape = template.shape  # Saved as variable for use later in code
 
+    # Matches the filename that will be created by make_transform_matrix; filename holds parameters
     filename = 'Matrices/{}x{}_{}x{}_{}_{}.npy'.format(img_shape[1], img_shape[0], template_shape[1], template_shape[0], rot_step, translate_step)
-    if not os.path.isfile(filename):  # Checking for matrix means if same parameters were already used, no need to remake it
+    if not os.path.isfile(filename):  # Checking for matrix
         print('Making new affine matrices')
-        make_transform_matrix(img_shape, template_shape, rot_step, translate_step)
+        make_transform_matrix(img_shape, template_shape, rot_step, translate_step)  # If matrix didn't exist already, make it and save it
 
-    aff_matrices = np.load(filename, allow_pickle=True)
+    aff_matrices = np.load(filename, allow_pickle=True, mmap_mode='r')  # Loading in mmap_mode 'r' means read only, can't change array
+
+    # Source of this vectorization code: https://stackoverflow.com/questions/46330728/manually-wirting-code-for-warpaffine-in-python
+
+    # Creates a matrix of the pixel locations in the image (with z=1 so translations work)
+    dst_y, dst_x = np.indices(template_shape)
+    coords = np.stack((dst_x.ravel(), dst_y.ravel(), np.ones(dst_y.size)))
+
+    print('Aff matrices and coords shapes:', aff_matrices.shape, coords.shape)
+
+    src_lin_pts = np.round(aff_matrices.dot(coords)).astype(int)  # Does dot product of affine matrices onto pixel locations
+
+    print(src_lin_pts.shape)
+    print('Shape:', (*src_lin_pts.shape[:-2], *img_shape))
+    templates = np.zeros((*src_lin_pts.shape[:-2], *img_shape), dtype=np.uint8)  # Makes an empty array for the templates
+
+    print(templates.shape, template.ravel().shape)
+
+    templates[:, :, src_lin_pts[:, :, 1], src_lin_pts[:, :, 0]] = template.ravel()  # Maps the template pixels to their new locations
+    print(templates.shape)
+
+    '''# All of this stuff is for doing the affine transformations one at a time (slower)
     print('\nBeginning 2nd part;\n')
     aff_shape = aff_matrices.shape
     print('Original aff matrices shape:', aff_matrices.shape)
@@ -429,24 +448,44 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
     size = (background.shape[1], background.shape[0])
     templates = []
     for affine in tqdm(aff_matrices):
-        print('Affine shape:', affine.shape)
         templates.append(cv2.warpAffine(template.astype(np.float32), affine.astype(np.float32), size, background, borderMode=cv2.BORDER_TRANSPARENT))
         # templates.append(cv2.warpPerspective(template, homography, size, background, borderMode=cv2.BORDER_TRANSPARENT))
+        print('Affine shape:', affine.shape, '\tTemplate shape:', np.array(templates).shape)
     templates = np.array(templates)
     print(templates.shape)  # Just for testing
     # templates.reshape(homog_matrices.shape)  # Reshapes back to original shape, but now it's the rotated template
-    # print(templates.shape)
+    # print(templates.shape)'''
 
+    positions = []
+    skipped = 0  # Just for debugging
 
     for path in tqdm(os.listdir(foldername)):
         if ".jpg" not in path:  # Skip files that aren't images
             skipped += 1
             continue
-        image = cv2.imread("{}/{}".format(foldername, path))
-
+        image = cv2.imread("{}/{}".format(foldername, path), 0)  # All astro images are read in black and white
+        print('image read')
 
         products = np.dot(templates, image)
-        print(products.shape)
+        print('Products shape:', products.shape)
+        position = np.argmax(products)
+        print(position)
+        positions.append(position)
+
+    print('Positions shape:', np.array(positions.shape), '\tSkipped:', skipped)
 
     np.save('Data/{}/positions.npy'.format(outFoldername), np.array(positions))
     print(skipped)
+
+
+import cProfile
+
+def cprof_test():
+    temp = np.ones((200, 200))
+    shape = (2048, 2048)
+    track_matrix_fast('Testing', 'Data/Testing/Denoised', temp, shape)
+
+# Just for testing
+if __name__ == '__main__':
+    # cProfile.run("cprof_test()")
+    cprof_test()
