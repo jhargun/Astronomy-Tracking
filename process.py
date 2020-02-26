@@ -428,7 +428,7 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
     print('Shape:', (*src_lin_pts.shape[:-2], *img_shape))
     templates = np.zeros((*src_lin_pts.shape[:-2], *img_shape), dtype=np.uint8)  # Makes an empty array for the templates
 
-    print(templates.shape, template.ravel().shape)
+    print('Templates and raveled shapes:', templates.shape, template.ravel().shape)
 
     templates[:, :, src_lin_pts[:, :, 1], src_lin_pts[:, :, 0]] = template.ravel()  # Maps the template pixels to their new locations
     print(templates.shape)
@@ -459,17 +459,24 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
     positions = []
     skipped = 0  # Just for debugging
 
-    for path in tqdm(os.listdir(foldername)):
+    for path in os.listdir(foldername)[:2]:  # Just doing first file for now, testing
         if ".jpg" not in path:  # Skip files that aren't images
             skipped += 1
             continue
         image = cv2.imread("{}/{}".format(foldername, path), 0)  # All astro images are read in black and white
-        print('image read')
+        # print('image read')
+        print('templates shape:', templates.shape)
+        print('Tile shape:', np.tile(image, (*templates.shape[:-2], 1, 1)).shape)
+        print(type(templates), type(image))
 
-        products = np.dot(templates, image)
+        # print(templates[0, 0].shape, image.shape)
+        # temp = templates[0,0]
+        # print(temp[:10, :10])
+        # products = np.dot(temp, image)
+        products = np.prod(templates, np.tile(image, (*templates.shape[:-2], 1, 1)))
         print('Products shape:', products.shape)
         position = np.argmax(products)
-        print(position)
+        print(position, '\n')
         positions.append(position)
 
     print('Positions shape:', np.array(positions.shape), '\tSkipped:', skipped)
