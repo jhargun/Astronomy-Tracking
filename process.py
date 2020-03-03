@@ -22,7 +22,7 @@ def show_image(image, name='Image'):
     cv2.destroyAllWindows()
 
 
-'''This function converts an image to a 0-1 range'''
+'''This helper function converts an image to a 0-1 range'''
 def normalize_image(data):
     return (data - np.amin(data)) / np.amax(data)
 
@@ -200,6 +200,8 @@ def track(outFoldername, foldername, template_rect, num_particles=500, sigma_exp
     #     pickle.dump(positions, file)
     np.save('Data/{}/positions.npy'.format(outFoldername), np.array(positions), allow_pickle=True)
     print('Skipped:', skipped)
+
+
 
 
 '''Detects lines in the denoised images'''
@@ -539,7 +541,7 @@ def aperture_photometry(positions, ap_rad=5, ann_inner_rad=8, an_outer_rad=11):
     plt.show()  # If you want the program to show the lightcurve
 
 
-'''All of this is for testing. It was commented out so the user does not need to install cProfile'''
+'''All of this is for testing'''
 # import cProfile
 #
 # '''This is just for testing, much quicker than actually tracking a star'''
