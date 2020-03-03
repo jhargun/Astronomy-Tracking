@@ -349,7 +349,7 @@ def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
 '''Tracks using matrices, much faster than old version. Returns list of tuples with (angle, x location, y location) of template
 Note: foldername should be where the denoised images are stored
 Set conserve_RAM to false if you are using large steps and have a lot of RAM to speed up program'''
-def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=10, translate_step=10, conserve_RAM=True):
+def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=90, translate_step=50, conserve_RAM=True):
     # print(rot_step, translate_step)
     template_shape = template.shape  # Saved as variable for use later in code
 
