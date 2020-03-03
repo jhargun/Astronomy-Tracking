@@ -74,9 +74,9 @@ def canvas():
         img = cv2.imread('app/static/images/Initial_Image.jpg', cv2.IMREAD_GRAYSCALE)
         template = img[y:y+height, x:x+width]
 
-        print('Warning: The tracking parameters are currently in testing mode (no rotation, 200 pixel translation steps)')  # Warns user
-        track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape, 360, 200)  # This is just for testing, very large steps=fast but inaccurate
-        # track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape)  # This is for real tracking
+        # print('Warning: The tracking parameters are currently in testing mode (no rotation, 200 pixel translation steps)')  # Warns user
+        # track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape, 360, 200)  # This is just for testing, very large steps=fast but inaccurate
+        track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape)  # This is for real tracking
         aperture_photometry(np.load('Data/Testing/positions.npy'))
         # track_matrix('Testing', 'Data/Testing/Denoised', template_rect)
         # track('Testing', 'Data/Testing/Denoised', template_rect)
