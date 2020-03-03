@@ -81,6 +81,10 @@
         // document.getElementById("coords").innerHTML = Math.round(x) + ", " + Math.round(y)  // Tests whether click detected
         // Source: https://www.w3schools.com/graphics/canvas_coordinates.asp
         var ctx = canvas.getContext("2d");
+
+        // context.clearRect(0, 0, canvas.width, canvas.height);  // Deletes old image
+        // ctx.drawImage(img, 0, 0);  // Makes new image so old circles disappear
+
         ctx.strokeStyle = "white";
         ctx.beginPath();
         ctx.arc(x, y, 10, 0, 7);  // Angle goes from 0 to 7 since that creates same circle as 0 to 2pi

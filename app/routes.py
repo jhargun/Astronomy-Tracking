@@ -48,9 +48,11 @@ def canvas():
         x = form.data['x']
         y = form.data['y']
         # outFolder = form.data['outputFolder']
-        '''TODO: Account for cases where x and y are close to edges
-        Note: Done, but can probably be made more pythonic
-        TODO: UNHARDCODE STUFF!!!'''
+        '''This accounts for cases where x and y are close to edges
+        Note: Done, but can probably be made more pythonic. I have left it as is because stars
+        are rarely, if ever, near edges of images
+        TODO: Unhardcode the image size parameters here if I decide to improve this section
+        TODO: Account for edges without reducing the template size (to avoid reducing accuracy)'''
         # This part makes the template bounds so that the star is in the center
         template_rect = {'x': x - 100, 'y': y - 100, 'h': 200, 'w': 200}
         if x < 100 or x > 1948:  # I hard coded a width bound here, change in the future
@@ -64,17 +66,21 @@ def canvas():
             if y > 1948:
                 template_rect['y'] = 2048 - y
 
-        '''TODO: I'm leaving previous code, which makes a dictionary, as is for now. Change this in the future'''
+        '''TODO: I'm leaving previous code, which makes a dictionary, as is for now. Potentially hange this in the future'''
         x = template_rect['x']
         y = template_rect['y']
         height = template_rect['h']
         width = template_rect['w']
         img = cv2.imread('app/static/images/Initial_Image.jpg', cv2.IMREAD_GRAYSCALE)
         template = img[y:y+height, x:x+width]
-        track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape)
+
+        print('Warning: The tracking parameters are currently in testing mode (no rotation, 200 pixel translation steps)')  # Warns user
+        track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape, 360, 200)  # This is just for testing, very large steps=fast but inaccurate
+        # track_matrix_fast('Testing', 'Data/Testing/Denoised', template, img.shape)  # This is for real tracking
+        aperture_photometry(np.load('Data/Testing/positions.npy'))
         # track_matrix('Testing', 'Data/Testing/Denoised', template_rect)
         # track('Testing', 'Data/Testing/Denoised', template_rect)
-        return redirect('/')
+        return redirect('/lightcurve')
 
     # If post request with form2, adjusts the denoising parameter
     elif form2.validate_on_submit() and form2.submit.data:
@@ -96,6 +102,12 @@ def canvas():
     if 'threshold' not in request.cookies:  # Sets cookie holding threshold if it hasn't been set
         response.set_cookie('threshold', '.35')  # Note: Threshold has to be a string, can't use a float
     return response
+
+
+'''This just shows the lightcurve'''
+@application.route('/lightcurve')
+def lightcurve():
+    return render_template('lightcurve.html')
 
 
 '''At the moment, all this does is detect lines. I will implement more troubleshooting in the future'''

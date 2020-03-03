@@ -1,24 +1,23 @@
 <html>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 
-    <body>
-      <div id="top">
-        <h1>Welcome to the tracking application!</h1>
-      </div>
-      <div id="instructions">
-        <h2>Please make sure the set of astronomical images containing the star that
-          you would like to track is in the folder Data/Raw</h2>
-      </div>
+    <div id="top">
+      <h1>Welcome to the tracking application!</h1>
+    </div>
+    <div id="instructions">
+      <h2>Put your astronomical image set in Data/Raw</h2>
+    </div>
 
-      <div id="form">
-        <form action="" method="post">
-            {{ form.hidden_tag() }}
+    <div id="form" class="input">
+      <form action="" method="post">
+          {{ form.hidden_tag() }}
+          <h4>Run Denoising {{form.denoise}}</h5>
+          <br>
+          <p>Check this box if you would like to run the denoising function. If it has
+            already been run, uncheck it to save time.</p>
+          <br>
+          {{form.submit}}
+      </form>
+    </div>
 
-            <p>Check this box if you would like to run the denoising function. If it has
-              already been run, uncheck it to save time.{{form.denoise}}</p>
-            <br>
-            {{form.submit}}
-        </form>
-      </div>
-    </body>
 </html>

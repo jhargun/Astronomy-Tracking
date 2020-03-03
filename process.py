@@ -10,6 +10,7 @@ from math import ceil, floor, exp, sin, cos, radians
 # import pickle
 # from PIL import Image
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 '''This just shows the image using opencv's imshow function. It can be useful for testing so I
@@ -284,13 +285,11 @@ def track_matrix(outFoldername, foldername, template_rect, rot_step=5):
 
 
 '''Makes the initial transformation matrix, long, assumes (x,y) corresponds to top left)
-rot_step is how many degrees rotation per step, translate step is how many pixels per translation'''
+rot_step is how many degrees rotation per step, translate step is how many pixels per translation.'''
 def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
     # Maximum length of the list of templates for a given angle (aka the length when the template isn't rotated)
-    print('shapes:', img_shape, template_shape)
     max_length = int((img_shape[0] - template_shape[0]) / translate_step + 1) * int((img_shape[1] - template_shape[1]) / translate_step + 1)
-    print('Max length:', max_length)
-    # print((img_shape[0] - template_shape[0]) / translate_step)
+
     transform_matrix = np.zeros((360 // rot_step, max_length, 2, 3)).astype(np.float16)  # Initialize empty array with correct shape
 
     '''Note: I have reduced the number of angles it goes through to test it without running out of RAM'''
@@ -314,81 +313,28 @@ def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
         min_y = ceil(np.amin(adjust_list[:, 1]))
         height = floor(np.amax(adjust_list[:, 1]) - min_y)
 
-        # for x in range(0, img_shape[1] - template_shape[1], translate_step):
-        #     for y in range(0, img_shape[0] - template_shape[0], translate_step):
-
-        print('\nX values:', -min_x, img_shape[1] - width - min_x, (img_shape[1] - width - min_x) // translate_step)
-        print('\nY values:', -min_y, img_shape[0] - height - min_y, (img_shape[0] - height - min_y) // translate_step)
-
-        # troubleshoot_counter = 0
+        # These are the minimum and maximum x and y values
+        # print('\nX values:', -min_x, img_shape[1] - width - min_x, (img_shape[1] - width - min_x) // translate_step)
+        # print('\nY values:', -min_y, img_shape[0] - height - min_y, (img_shape[0] - height - min_y) // translate_step)
 
         '''Note: Right here, should I subtract the min_x and min_y from the final? I think, but check again'''
         # Iterates through all x and y values possible
         for x in range(-min_x, img_shape[1] - width - min_x, translate_step):
             for y in range(-min_y, img_shape[0] - height - min_y, translate_step):
-                # troubleshoot_counter += 1
                 # This is the affine matrix for rotation and translation
                 matrix = np.array([[cos(theta), -sin(theta), x],
                                    [sin(theta), cos(theta),  y]])
                 matrices.append(matrix)
-                # transform_matrix[ang].append(matrix)
 
-                '''  # All of this was overkill, as it turns out I can just use affine transformation
-                # This is the matrix that does the rotation and translation
+                ''' # This is the homography matrix that does the rotation and translation (unecessary here, affine works)
                 matrix = np.array([[cos(theta), -sin(theta), x],
                                    [sin(theta), cos(theta),  y],
-                                   [0,          0,           1]])
+                                   [0,          0,           1]])'''
 
-                new_points = np.array([np.matmul(matrix, point)[:2] for point in old_points]).astype(int)  # Get new points
-
-                # print('New points:', new_points)
-
-                homography, _ = cv2.findHomography(old_points[:, :2], new_points)  # Homography matrix that will be used later
-                transform_matrix[ang].append(homography)
-                # if x == -min_x and y == -min_y:
-                #     print('Homography:', homography)
-                # transform_matrix[ang].append(matrix)
-                '''
-
-        # print('TC:', troubleshoot_counter)
-        # print('\n\nMatrices shape:', np.array(matrices).shape)
-        # # Add padding to matrices so transform_matrix is rectangular (can't have jagged np arrays)
-        #
-        # print('Difference:', (max_length - len(matrices)))
-        # print('{} - {} = {}'.format(max_length, len(matrices), (max_length - len(matrices))))
-        # print('Appended part shape:', np.array([[[0,0,0],[0,0,0]]] * (max_length - len(matrices))).shape)
         if max_length - len(matrices) != 0:
             matrices = np.append(matrices, [[[0,0,0],[0,0,0]]] * (max_length - len(matrices)), axis=0)
 
-        # print('Matrices post adjustment:',  np.array(matrices).shape, '\n')
-
-        # if len(transform_matrix) == 0:
-        #     transform_matrix = [matrices]
-        # else:
-        #     transform_matrix.append([matrices])
         transform_matrix[ang] = matrices
-        # print(np.array(transform_matrix).shape)
-        # transform_matrix.append([matrices])
-
-    ''' # This part was doing the adjustment to make the array rectangular, shouldn't be necessary anymore
-    try:
-        test = np.array(transform_matrix)
-        print('\nTest matrix shape:', test.shape, '\n')
-    except Exception as e:
-        print('\nError when trying to convert to np array:', e, '\n')
-
-    # This next part makes
-    max_length = 0
-    for i in range(len(transform_matrix)):
-        if len(transform_matrix[i]) > max_length:
-            max_length = len(transform_matrix[i])
-    for i in range(len(transform_matrix)):
-        print(np.array([[[0,0,0],[0,0,0]]] * (max_length - len(transform_matrix[i]))).shape)
-        transform_matrix[i].append([[[0,0,0],[0,0,0]]] * (max_length - len(transform_matrix[i])))
-        # transform_matrix[i].append([[0,0,0],[0,0,0],[0,0,0]])
-    '''
-
-    print('Transform shape:',transform_matrix.shape)
 
     # Save the matrix for these steps, image size, and template size; saves a lot of time in the future; uses parameters for name
     filename = 'Matrices/{}x{}_{}x{}_{}_{}.npy'.format(img_shape[1], img_shape[0], template_shape[1], template_shape[0], rot_step, translate_step)
@@ -400,10 +346,11 @@ def make_transform_matrix(img_shape, template_shape, rot_step, translate_step):
 '''TODO: Add some troubleshooting where it warns if the similarity between matrices is very small'''
 
 
-'''Tracks using matrices, much faster than old version
+'''Tracks using matrices, much faster than old version. Returns list of tuples with (angle, x location, y location) of template
 Note: foldername should be where the denoised images are stored
-Set save_images to false if you don't want the visualization'''
-def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=360, translate_step=200, save_images=True):
+Set conserve_RAM to false if you are using large steps and have a lot of RAM to speed up program'''
+def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=10, translate_step=10, conserve_RAM=True):
+    # print(rot_step, translate_step)
     template_shape = template.shape  # Saved as variable for use later in code
 
     # Matches the filename that will be created by make_transform_matrix; filename holds parameters
@@ -413,6 +360,7 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
         make_transform_matrix(img_shape, template_shape, rot_step, translate_step)  # If matrix didn't exist already, make it and save it
 
     aff_matrices = np.load(filename, allow_pickle=True, mmap_mode='r')  # Loading in mmap_mode 'r' means read only, can't change array
+    print('aff_mat shape:', aff_matrices.shape)
 
     # Source of this vectorization code: https://stackoverflow.com/questions/46330728/manually-wirting-code-for-warpaffine-in-python
 
@@ -420,18 +368,95 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
     dst_y, dst_x = np.indices(template_shape)
     coords = np.stack((dst_x.ravel(), dst_y.ravel(), np.ones(dst_y.size)))
 
-    print('Aff matrices and coords shapes:', aff_matrices.shape, coords.shape)
+    # print('Aff matrices and coords shapes:', aff_matrices.shape, coords.shape)
 
-    src_lin_pts = np.round(aff_matrices.dot(coords)).astype(int)  # Does dot product of affine matrices onto pixel locations
+    positions = []  # This list holds the positions of the template in all images
 
-    print(src_lin_pts.shape)
-    print('Shape:', (*src_lin_pts.shape[:-2], *img_shape))
-    templates = np.zeros((*src_lin_pts.shape[:-2], *img_shape), dtype=np.uint8)  # Makes an empty array for the templates
+    if not conserve_RAM:  # If dealing with large step sizes, can avoid for loop
+        src_lin_pts = np.round(aff_matrices.dot(coords.astype(np.float16))).astype(np.int16)  # Does dot product of affine matrices onto pixel locations
+        templates = np.zeros((*src_lin_pts.shape[:-2], *img_shape), dtype=np.uint8)  # Makes an empty array for the templates
+        templates[:, :, src_lin_pts[:, :, 1], src_lin_pts[:, :, 0]] = template.ravel()  # Maps the template pixels to their new locations
 
-    print('Templates and raveled shapes:', templates.shape, template.ravel().shape)
+        skipped = 0  # Just for debugging
 
-    templates[:, :, src_lin_pts[:, :, 1], src_lin_pts[:, :, 0]] = template.ravel()  # Maps the template pixels to their new locations
-    print(templates.shape)
+        for path in tqdm(os.listdir(foldername)):  # Just doing first file for now, testing
+            if ".jpg" not in path:  # Skip files that aren't images
+                skipped += 1
+                continue
+            image = cv2.imread("{}/{}".format(foldername, path), 0)  # All astro images are read in black and white
+
+            # print('tile shape:', (*templates.shape[:-2], 1, 1))
+            # images = np.tile(image, (*templates.shape[:-2], 1, 1))  # Creates list of images in same shape as templates
+            products = np.multiply(templates, image)  # Multiply templates by image
+            # print('Products shape:', products.shape)
+            products = np.sum(np.reshape(products, (*products.shape[:-2], np.prod(products.shape[-2:]))), axis=2)  # Sum results for each template
+
+            position = np.unravel_index(np.argmax(products), aff_matrices.shape[:-2])  # Gets the index where the template and image align most
+            # print(type(position[1]), type((img_shape // translate_step)))
+            print('\n', position)
+            x_loc = position[1] // (img_shape[1] // translate_step) * translate_step
+            y_loc = position[1] % (img_shape[1] // translate_step) * translate_step
+            print('Position:\tRotation angle: {} degrees\tX location: {} pixels from left\tY location: {} pixels from top'.format(position[0]*rot_step, x_loc, y_loc))
+
+            positions.append((position[0]*rot_step, x_loc, y_loc))
+
+        print('Files skipped:', skipped)
+
+    else:  # This method is slower but takes much less RAM
+        skipped = 0
+        num_ims = 500  # This is the number of templates tried at once; reduce to use less memory, increase to speed up
+
+        for path in tqdm(os.listdir(foldername)):
+            if ".jpg" not in path:  # Skip files that aren't images
+                skipped += 1
+                continue
+
+            image = cv2.imread("{}/{}".format(foldername, path), 0)
+            # print('im shape:', image.shape)
+
+            # images = np.tile(image, (num_ims, 1, 1))
+            # print('images shape:', images.shape)
+
+            maxes = []  # This array holds the maximum values at each rotation angle
+
+            for ang in range(aff_matrices.shape[0]):
+                for i in range(0, aff_matrices.shape[1], num_ims):
+                    # Does same thing as conserve_RAM but with num_ims templates at a time
+                    src_lin_pts = np.round(aff_matrices[ang, i:i+num_ims].dot(coords.astype(np.float16))).astype(np.int16)
+                    # print('scr_lin_pts shape:', src_lin_pts.shape)
+                    templates = np.zeros((*src_lin_pts.shape[:-2], *img_shape), dtype=np.uint8)
+                    templates[:, src_lin_pts[:, 1], src_lin_pts[:, 0]] = template.ravel()
+                    # print('templates shape:', templates.shape)
+
+                    # products = np.multiply(templates, image)
+                    products = np.multiply(image, templates)
+                    # print('products shape:', np.array(products).shape)
+                    products = np.sum(np.sum(products, axis=1), axis=1)  # Gets total value of each multiplication
+                    # products = np.sum(np.reshape(products, (*products.shape[:-2], np.prod(products.shape[-2:]))), axis=2)
+                    # print('products shape:', products.shape)
+                    # print(len(products), np.argmax(products))
+                    position = np.argmax(products)
+                    # position = np.unravel_index(np.argmax(products), aff_matrices.shape[:-2])
+                    # print('\nPosition:', position)
+                    x_loc = position // (img_shape[1] // translate_step) * translate_step  # Position divided by number of steps times translate step size
+                    y_loc = position % (img_shape[1] // translate_step) * translate_step
+                    # print('Position:{}\tX location: {} pixels from left\tY location: {} pixels from top'.format(position, position[0], position[1]))
+                    # print('position shape:', np.array(position).shape)
+                    # print('New coords:\t{}\t{}'.format(position[0]*translate_step, position[1]*translate_step))
+                    maxes.append([np.amax(products), ang*rot_step, x_loc, y_loc])
+                    # maxes.append((np.amax(products), ang, x_loc, y_loc))  # Add the maximum similarity for this angle to maxes
+
+            # print('Maxes shape', np.array(maxes).shape)
+            maxes = np.array(maxes)
+            position = maxes[np.argmax(maxes[:, 0]), 1:]  # Finds maximum for all angles
+            # print('Position:', position)
+            # position[0] *= rot_step  # Adjusts angle with rot_step
+            positions.append(position)
+
+        print('Files skipped:', skipped)
+
+
+
 
     '''# All of this stuff is for doing the affine transformations one at a time (slower)
     print('\nBeginning 2nd part;\n')
@@ -456,43 +481,85 @@ def track_matrix_fast(outFoldername, foldername, template, img_shape, rot_step=3
     # templates.reshape(homog_matrices.shape)  # Reshapes back to original shape, but now it's the rotated template
     # print(templates.shape)'''
 
-    positions = []
-    skipped = 0  # Just for debugging
 
-    for path in os.listdir(foldername)[:2]:  # Just doing first file for now, testing
-        if ".jpg" not in path:  # Skip files that aren't images
-            skipped += 1
-            continue
-        image = cv2.imread("{}/{}".format(foldername, path), 0)  # All astro images are read in black and white
-        # print('image read')
-        print('templates shape:', templates.shape)
-        print('Tile shape:', np.tile(image, (*templates.shape[:-2], 1, 1)).shape)
-        print(type(templates), type(image))
-
-        # print(templates[0, 0].shape, image.shape)
-        # temp = templates[0,0]
-        # print(temp[:10, :10])
-        # products = np.dot(temp, image)
-        products = np.prod(templates, np.tile(image, (*templates.shape[:-2], 1, 1)))
-        print('Products shape:', products.shape)
-        position = np.argmax(products)
-        print(position, '\n')
-        positions.append(position)
-
-    print('Positions shape:', np.array(positions.shape), '\tSkipped:', skipped)
+    print('Positions shape:', np.array(positions).shape, '\tSkipped:', skipped)
 
     np.save('Data/{}/positions.npy'.format(outFoldername), np.array(positions))
-    print(skipped)
 
 
-import cProfile
+'''This does the basic aperture photometry for a single star
+Note: coordinates should be in (x,y form)
+The aperture is the radius of the star; the annulus is the background pixels that are
+averaged and subtracted from the star's brightness to account for noise'''
+def get_brightness(coords, image, ap_rad, ann_inner_rad, an_outer_rad):
+    # print('Image shape:', image.shape)
+    '''I set all of the pixels in the annulus to 128 and all of the pixels in the aperture to 255, which
+    I then use to find the coordinates of pixels that are inside the annulus and aperture using np.where'''
+    background = np.zeros(image.shape, dtype=np.uint8)
+    cv2.circle(background, coords, an_outer_rad, 128, -1)  # Creates circle for outer radius of annulus
+    cv2.circle(background, coords, ann_inner_rad, 0, -1)  # Creates inner boundary of annulus
+    cv2.circle(background, coords, ap_rad, 255, -1)  # Creates full white circle (aperture)
+    an_coords = np.where(background == 128)  # Coordinates of pixels in annulus
+    ap_coords = np.where(background == 255)  # Coordinates of pixels in aperture
+    # print('Coords shapes:', np.array(an_coords).shape, np.array(ap_coords).shape)
+    return np.sum(image[ap_coords] - np.mean(image[an_coords]))
 
-def cprof_test():
-    temp = np.ones((200, 200))
-    shape = (2048, 2048)
-    track_matrix_fast('Testing', 'Data/Testing/Denoised', temp, shape)
 
-# Just for testing
-if __name__ == '__main__':
-    # cProfile.run("cprof_test()")
-    cprof_test()
+'''Takes list of positions of stars, does aperture photometry and creates a lightcurve
+Takes positions of star in each image as well as aperture radius, annulus inner/outer radius'''
+def aperture_photometry(positions, ap_rad=5, ann_inner_rad=8, an_outer_rad=11):
+    brightness_values = []
+    i = 0
+    skipped = 0
+    foldername = 'Data/Raw'
+    paths = os.listdir(foldername)
+    '''TODO: CORRECT THE INCREASE OF I EVEN WHEN FILE IS SKIPPED!!!'''
+    while (i < len(paths)) and (i < len(positions)):
+        # if i % 10 == 0:  # Rudimentary progress bar
+        #     print(i)
+        path = paths[i]
+        if (".fts" not in path) or ("_D_" in path) or ("AutoFlat" in path):
+            del paths[i]
+            skipped += 1
+            continue
+
+        with fits.open("{}/{}".format(foldername, path)) as hdul:
+            image = hdul[0].data
+            # print(positions[i])
+            brightness_values.append(get_brightness(tuple(positions[i])[1:], image, ap_rad, ann_inner_rad, an_outer_rad))
+
+        i += 1
+
+    if (i != len(paths)) or (i != len(positions)):  # This gives a warning, but it does not necessarily mean something went wrong
+        print('Warning: did not run through the whole array:', i, len(paths), len(positions))
+    print('Skipped:', skipped)
+    plt.plot(np.arange(len(brightness_values)), np.array(brightness_values))  # Creates the lightcurve, assumes equal time between exposures
+    plt.savefig('Data/lightcurve.png')
+    plt.savefig('app/static/images/lightcurve.png')
+    plt.show()  # If you want the program to show the lightcurve
+
+
+'''All of this is for testing. It was commented out so the user does not need to install cProfile'''
+# import cProfile
+#
+# '''This is just for testing, much quicker than actually tracking a star'''
+# def cprof_test():
+#     temp = np.ones((200, 200))
+#     shape = (2048, 2048)
+#     track_matrix_fast('Testing', 'Data/Testing/Denoised', temp, shape, rot_step=360, translate_step=200, conserve_RAM=True)
+#
+# '''This is for testing the efficiency of the aperture photometry'''
+# def cprof_test2():
+#     aperture_photometry(np.load('Data/Testing/positions.npy'))
+#
+#
+# # Just for testing
+# if __name__ == '__main__':
+#     # cProfile.run("cprof_test()")
+#     # cprof_test()
+#
+#     # cProfile.run("cprof_test2()")
+#     cprof_test2()
+#
+#     # pos = np.array([(837, 1815) for _ in range(200)])
+#     # aperture_photometry(pos)

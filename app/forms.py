@@ -37,4 +37,4 @@ class CanvasForm(FlaskForm):
     '''I will implement this field shortly. It will allow the user to chose the
     name of the output folder'''
     # outputFolder = StringField('outputFolder', validators=[DataRequired()])
-    submit = SubmitField('Track')
+    submit = SubmitField('Track and Create Light Curve')
