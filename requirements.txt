@@ -1,7 +1,7 @@
 astropy==4.0
 Click==7.0
 cycler==0.10.0
-Flask==1.1.1
+Flask==2.3.2
 Flask-WTF==0.14.3
 h5py==2.10.0
 itsdangerous==1.1.0
